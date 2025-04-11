@@ -1,0 +1,3 @@
+Use this file to load the row label data
+If you are using the "single_file" option for the "row_label_data_source" variable
+Each line in this text-file represents the data for one row of the output
