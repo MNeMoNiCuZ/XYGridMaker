@@ -141,14 +141,4 @@ row_label_font_color = "white"  # Text color
 - When using "multiple_files" for row labels, ensure text files have the same base name as the images
 - Experiment with row and column label positions for the most readable layout
 - Use repeat_column_labels_every_n_rows for grids with many rows to improve readability
-- For large comparison grids, enable scaling to avoid dimension limits
-
-## Troubleshooting
-
-- If you encounter font issues, make sure the specified font file exists
-- If the grid is too large, try reducing the scale percentage or splitting into multiple images
-- For memory errors, try reducing the number of images or their size
-
-## License
-
-This tool is free to use and modify for personal and commercial purposes. 
+- For large comparison grids, you may want to scale it down, or use the automatic splitting if it becomes too big
