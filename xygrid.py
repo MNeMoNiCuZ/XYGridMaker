@@ -22,11 +22,12 @@ column_label_y_offset = 20  # Y offset for column labels (can be positive or neg
 column_label_bg_color = "black"  # Background color of the column labels
 column_label_font_color = "white"  # Font color of the column labels
 crop_column_label_text = True  # If True, crop the column label text to fit within the row height
+repeat_column_labels_every_n_rows = 10  # Repeat the column labels every N rows (0 means no repetition)
 
 # Row label options
 enable_row_labels = True  # Set to True to enable row labels
 row_label_position = "both"  # Position of row labels: "left" or "right" or "both"
-row_label_width = 400 #Width of the row label column
+row_label_width = 500 #Width of the row label column
 row_font_size = 50  # Font size for the row labels
 row_font_type = "arial.ttf"  # Font type for the row labels
 row_label_x_alignment = "center"  # Alignment of the row label text: "left", "center", "right"
@@ -40,11 +41,12 @@ remove_tags = True  # Removes tags contained inside < and > from the row label
 row_label_data_source = "positive_prompt"  # Options: "positive_prompt", "single_file", "multiple_files"
 row_label_data_file = "./row_label_data.txt"  # File used when row_label_data_source is "single_file". One line in the text-file represents one row of images
 row_label_data_folder = "./input"  # Folder used when row_label_data_source is "multiple_files". One .txt-file per input image, matching the input image name to pair up
-repeat_column_labels_every_n_rows = 2  # Repeat the column labels every N rows (0 means no repetition)
 
 # Other settings
+input_column_images_grouped = False  # If true, it will look for images in sequence instead of interweaved. If false, images are expected to be interweaved
 num_columns = 3  # Number of columns
 column_titles = ["Column 1", "Column 2", "Column 3"] # Titles for each column
+column_order_override = []  # Override column order. Example: [0,3,1,2] would put the last column second. Partial lists are supported.
 output_scale_percent = 100  # Percentage to scale images (100% is default)
 output_format = "JPG"  # Output format: "PNG", "JPG" or "JPEG"
 output_image_path = os.path.join(output_folder, f"{output_image_name}.{output_format.lower()}")
@@ -194,11 +196,46 @@ def adjust_font_size(draw, text, font_path, max_width, max_height, initial_font_
 # Load images from input folder
 image_files = sorted([os.path.join(input_folder, f) for f in os.listdir(input_folder) if f.lower().endswith(('.png', '.jpg', '.jpeg'))])
 
-# Group images by model (assuming the naming convention: 1, 10, 19,... belong to Model 1; 2, 11, 20,... belong to Model 2, etc.)
+# Group images by model
+# Apply column order override if specified
+if column_order_override != [0]:
+    # Create a complete order list by filling in missing indices
+    complete_order = []
+    used_indices = set()
+    
+    # Add specified indices first
+    for idx in column_order_override:
+        if idx < num_columns and idx not in used_indices:
+            complete_order.append(idx)
+            used_indices.add(idx)
+    
+    # Add remaining indices in order
+    for idx in range(num_columns):
+        if idx not in used_indices:
+            complete_order.append(idx)
+    
+    # Reorder column titles
+    column_titles = [column_titles[i] for i in complete_order]
+
 images_by_model = [[] for _ in range(num_columns)]
-for idx, image_file in enumerate(image_files):
-    model_index = idx % num_columns
-    images_by_model[model_index].append(image_file)
+if input_column_images_grouped:
+    images_per_column = len(image_files) // num_columns
+    for col in range(num_columns):
+        start_idx = col * images_per_column
+        end_idx = (col + 1) * images_per_column
+        images_by_model[col] = image_files[start_idx:end_idx]
+    
+    # Apply column order to images after grouping
+    if column_order_override != [0]:
+        images_by_model = [images_by_model[i] for i in complete_order]
+else:
+    for idx, image_file in enumerate(image_files):
+        model_index = idx % num_columns
+        images_by_model[model_index].append(image_file)
+    
+    # Apply column order to images after grouping
+    if column_order_override != [0]:
+        images_by_model = [images_by_model[i] for i in complete_order]
 
 # Calculate height constraints before processing
 print("\n=== Image Grid Height Analysis ===")
@@ -342,7 +379,10 @@ def create_output_image(start_row, end_row, output_path, suffix=""):
     if enable_column_labels and column_label_position in ["bottom", "both"]:
         total_height += column_label_height_scaled
 
+    # Calculate total width without row labels first
     total_width = max_image_width * num_columns
+    
+    # Only add row label width if row labels are enabled
     if enable_row_labels:
         if row_label_position in ["left", "right"]:
             total_width += row_label_width
@@ -366,7 +406,9 @@ def create_output_image(start_row, end_row, output_path, suffix=""):
     current_y_offset = 0
     if enable_column_labels and column_label_position in ["top", "both"]:
         for col in range(num_columns):
-            col_x_offset = (col * max_image_width) + (row_label_width if row_label_position in ["left", "both"] else 0)
+            # Only add row label width if row labels are enabled
+            row_label_offset = row_label_width if enable_row_labels and row_label_position in ["left", "both"] else 0
+            col_x_offset = (col * max_image_width) + row_label_offset
             draw.rectangle([col_x_offset, current_y_offset, col_x_offset + max_image_width, current_y_offset + column_label_height_scaled], fill=column_label_bg_color)
             text_y = current_y_offset + (column_label_height_scaled - column_font_size_scaled) // 2 + int(column_label_y_offset * output_scale_percent / 100)
             draw.text((col_x_offset + max_image_width // 2, text_y), column_titles[col], fill=column_label_font_color, font=column_font, anchor="mm")
@@ -418,7 +460,9 @@ def create_output_image(start_row, end_row, output_path, suffix=""):
 
         for col, img in enumerate(scaled_images):
             if row < len(img):
-                col_x_offset = (col * max_image_width) + (row_label_width if row_label_position in ["left", "both"] else 0)
+                # Only add row label width if row labels are enabled
+                row_label_offset = row_label_width if enable_row_labels and row_label_position in ["left", "both"] else 0
+                col_x_offset = (col * max_image_width) + row_label_offset
                 output_image.paste(img[row], (col_x_offset, current_y_offset))
         
         current_y_offset += max_image_height
@@ -429,7 +473,9 @@ def create_output_image(start_row, end_row, output_path, suffix=""):
         # Draw repeated labels, but skip if we're on the last row and would draw bottom labels
         if enable_column_labels and column_label_position == "both" and needs_repeated_label and not (is_last_row and column_label_position in ["bottom", "both"]):
             for col in range(num_columns):
-                col_x_offset = (col * max_image_width) + (row_label_width if row_label_position in ["left", "both"] else 0)
+                # Only add row label width if row labels are enabled
+                row_label_offset = row_label_width if enable_row_labels and row_label_position in ["left", "both"] else 0
+                col_x_offset = (col * max_image_width) + row_label_offset
                 draw.rectangle([col_x_offset, current_y_offset, col_x_offset + max_image_width, current_y_offset + column_label_height_scaled], fill=column_label_bg_color)
                 text_y = current_y_offset + (column_label_height_scaled - column_font_size_scaled) // 2 + int(column_label_y_offset * output_scale_percent / 100)
                 draw.text((col_x_offset + max_image_width // 2, text_y), column_titles[col], fill=column_label_font_color, font=column_font, anchor="mm")
@@ -438,7 +484,9 @@ def create_output_image(start_row, end_row, output_path, suffix=""):
     # Draw bottom labels if needed
     if enable_column_labels and column_label_position in ["bottom", "both"]:
         for col in range(num_columns):
-            col_x_offset = (col * max_image_width) + (row_label_width if row_label_position in ["left", "both"] else 0)
+            # Only add row label width if row labels are enabled
+            row_label_offset = row_label_width if enable_row_labels and row_label_position in ["left", "both"] else 0
+            col_x_offset = (col * max_image_width) + row_label_offset
             draw.rectangle([col_x_offset, current_y_offset, col_x_offset + max_image_width, current_y_offset + column_label_height_scaled], fill=column_label_bg_color)
             text_y = current_y_offset + (column_label_height_scaled - column_font_size_scaled) // 2 + int(column_label_y_offset * output_scale_percent / 100)
             draw.text((col_x_offset + max_image_width // 2, text_y), column_titles[col], fill=column_label_font_color, font=column_font, anchor="mm")
