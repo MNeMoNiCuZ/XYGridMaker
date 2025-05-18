@@ -99,6 +99,7 @@ XYGridMaker offers three different sources for row label data:
 ```python
 num_columns = 6  # Number of columns in the grid
 column_titles = ["Model 1", "Model 2", "Model 3"...]  # Titles for each column
+column_order_override = []  # Override column order. Example: [0,3,1,2] reorders columns so the last column appears second. Partial lists are supported.
 output_scale_percent = 100  # Scale the output image (100% = original size)
 output_format = "JPG"  # Output format: "PNG", "JPG", or "JPEG"
 ```
@@ -113,6 +114,8 @@ output_format = "JPG"  # Output format: "PNG", "JPG", or "JPEG"
 - **Output**: The final grid is saved in the `output` folder
   - Default filename: `xygrid.jpg` (or .png depending on configuration)
   - The script may split into multiple files if the grid exceeds size limits
+
+
 
 ## Advanced Features
 
